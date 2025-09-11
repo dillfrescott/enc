@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; worker-src 'self';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <title>File Encryptor</title>
+    <script src="./tailwindcss.js"></script>
+    <script src="./argon2-bundled.min.js"></script>
+    <script src="./StreamSaver.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .file-input-label {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .file-input-label:active {
+            transform: scale(0.98);
+        }
+        .tab-content {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .hidden-tab {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-2xl p-6 md:p-8 border border-gray-700">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">File Encryptor</h1>
+            <p class="text-teal-300 mt-2 font-semibold">Hybrid Mode: ML-KEM + Argon2id + AES-256</p>
+            <p class="text-xs text-gray-500 mt-1">Your files never leave your device.</p>
+        </div>
+
+        <div class="mb-6">
+            <div class="relative border-b border-gray-700">
+                <div class="flex">
+                    <button id="encrypt-tab-btn" class="flex-1 py-3 text-center font-semibold text-white transition-colors duration-300">Encrypt</button>
+                    <button id="decrypt-tab-btn" class="flex-1 py-3 text-center font-semibold text-gray-400 hover:text-white transition-colors duration-300">Decrypt</button>
+                </div>
+                <div id="tab-underline" class="absolute bottom-0 left-0 h-0.5 bg-teal-400 transition-transform duration-300 ease-in-out" style="width: 50%; transform: translateX(0%);"></div>
+            </div>
+        </div>
+
+        <div id="main-content">
+            <div id="encrypt-tab" class="tab-content">
+                <div class="space-y-6">
+                    <div>
+                        <label for="encrypt-file-input" class="block text-sm font-medium text-gray-300 mb-2">1. Choose a file to encrypt</label>
+                        <input type="file" id="encrypt-file-input" class="hidden">
+                        <label for="encrypt-file-input" class="file-input-label bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg w-full text-center block">
+                            Select File
+                        </label>
+                        <p id="encrypt-file-name" class="text-sm text-gray-400 mt-2 truncate">No file selected.</p>
+                    </div>
+                    <div>
+                        <label for="encrypt-password" class="block text-sm font-medium text-gray-300 mb-2">2. Set a strong password</label>
+                        <div class="relative">
+                            <input type="password" id="encrypt-password" class="w-full bg-gray-700 border border-gray-600 rounded-lg pl-4 pr-12 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-400" placeholder="Enter a secure password">
+                            <button type="button" id="toggle-encrypt-password-btn" class="absolute inset-y-0 right-0 flex items-center px-4 text-gray-400 hover:text-gray-200 focus:outline-none">
+                                <svg id="eye-encrypt-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                <svg id="eye-off-encrypt-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 hidden"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="encrypt-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition transform hover:scale-105 active:scale-100 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg id="encrypt-spinner" class="animate-spin h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span id="encrypt-btn-text">Encrypt & Save File</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="decrypt-tab" class="tab-content hidden-tab">
+                <div class="space-y-6">
+                    <div>
+                        <label for="decrypt-file-input" class="block text-sm font-medium text-gray-300 mb-2">1. Choose a file to decrypt (.enc)</label>
+                        <input type="file" id="decrypt-file-input" class="hidden" accept=".enc">
+                        <label for="decrypt-file-input" class="file-input-label bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg w-full text-center block">
+                            Select .enc File
+                        </label>
+                        <p id="decrypt-file-name" class="text-sm text-gray-400 mt-2 truncate">No file selected.</p>
+                    </div>
+                    <div>
+                        <label for="decrypt-password" class="block text-sm font-medium text-gray-300 mb-2">2. Enter the password</label>
+                         <div class="relative">
+                            <input type="password" id="decrypt-password" class="w-full bg-gray-700 border border-gray-600 rounded-lg pl-4 pr-12 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-400" placeholder="Enter the password for the file">
+                             <button type="button" id="toggle-decrypt-password-btn" class="absolute inset-y-0 right-0 flex items-center px-4 text-gray-400 hover:text-gray-200 focus:outline-none">
+                                 <svg id="eye-decrypt-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                 <svg id="eye-off-decrypt-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 hidden"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
+                             </button>
+                         </div>
+                    </div>
+                    <button id="decrypt-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition transform hover:scale-105 active:scale-100 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg id="decrypt-spinner" class="animate-spin h-5 w-5 text-white hidden" fill="none" viewBox="0 0 24 24">
+                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span id="decrypt-btn-text">Decrypt & Save File</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="status-area" class="mt-8 p-4 bg-gray-900 rounded-lg min-h-[100px] text-sm text-gray-400 font-mono whitespace-pre-wrap">Welcome! This tool uses a hybrid scheme for security. Your password protects the secret key.</div>
+    </div>
+	
+    <script type="importmap">
+      {
+        "imports": {
+          "mlkem": "./mlkem.js"
+        }
+      }
+    </script>
+    <script type="module">
+        import { MlKem768 } from 'mlkem';
+
+        const encryptTabBtn = document.getElementById('encrypt-tab-btn');
+        const decryptTabBtn = document.getElementById('decrypt-tab-btn');
+        const encryptTab = document.getElementById('encrypt-tab');
+        const decryptTab = document.getElementById('decrypt-tab');
+        const encryptFileInput = document.getElementById('encrypt-file-input');
+        const encryptFileName = document.getElementById('encrypt-file-name');
+        const encryptPasswordInput = document.getElementById('encrypt-password');
+        const encryptBtn = document.getElementById('encrypt-btn');
+        const decryptFileInput = document.getElementById('decrypt-file-input');
+        const decryptFileName = document.getElementById('decrypt-file-name');
+        const decryptPasswordInput = document.getElementById('decrypt-password');
+        const decryptBtn = document.getElementById('decrypt-btn');
+        const statusArea = document.getElementById('status-area');
+        const toggleEncryptPasswordBtn = document.getElementById('toggle-encrypt-password-btn');
+        const toggleDecryptPasswordBtn = document.getElementById('toggle-decrypt-password-btn');
+        const encryptSpinner = document.getElementById('encrypt-spinner');
+        const encryptBtnText = document.getElementById('encrypt-btn-text');
+        const decryptSpinner = document.getElementById('decrypt-spinner');
+        const decryptBtnText = document.getElementById('decrypt-btn-text');
+        
+        let encryptFile = null;
+        let decryptFile = null;
+
+        const SALT_SIZE = 64;
+        const IV_SIZE = 12;
+        const CHUNK_SIZE = 1024 * 1024 * 4;
+
+        const MIN_PASSWORD_LENGTH = 8;
+
+        const ARGON2_PARAMS = {
+            time: 32,
+            mem: 131072,
+            parallelism: 4,
+            hashLen: 32,
+            type: argon2.ArgonType.Argon2id
+        };
+
+        const sanitizeForDisplay = (str) => {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        };
+
+        const logStatus = (message, type = 'info') => {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            const colorClass = type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-gray-400';
+            statusArea.innerHTML = `<span class="${colorClass}">${sanitizeForDisplay(message)}</span>`;
+        };
+        
+        const switchTab = (tabName) => {
+            const isEncrypt = tabName === 'encrypt';
+            const tabUnderline = document.getElementById('tab-underline');
+
+            encryptTab.classList.toggle('hidden-tab', !isEncrypt);
+            decryptTab.classList.toggle('hidden-tab', isEncrypt);
+            encryptTabBtn.classList.toggle('text-white', isEncrypt);
+            encryptTabBtn.classList.toggle('text-gray-400', !isEncrypt);
+            decryptTabBtn.classList.toggle('text-white', !isEncrypt);
+            decryptTabBtn.classList.toggle('text-gray-400', isEncrypt);
+            tabUnderline.style.transform = isEncrypt ? 'translateX(0%)' : 'translateX(100%)';
+            logStatus(`Switched to ${isEncrypt ? 'Encrypt' : 'Decrypt'} tab.`);
+        };
+        
+        const togglePasswordVisibility = (passwordInput, eyeIcon, eyeOffIcon) => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            eyeIcon.classList.toggle('hidden', isPassword);
+            eyeOffIcon.classList.toggle('hidden', !isPassword);
+        };
+
+        const showSpinner = (isSpinning, button, spinner, text) => {
+            button.disabled = isSpinning;
+            spinner.classList.toggle('hidden', !isSpinning);
+            text.classList.toggle('hidden', isSpinning);
+        };
+
+        const secureArrayBufferToBase64 = (buffer) => {
+            if (!(buffer instanceof ArrayBuffer)) {
+                throw new Error('Input must be an ArrayBuffer');
+            }
+            const bytes = new Uint8Array(buffer);
+            if (bytes.length === 0) {
+                throw new Error('Buffer cannot be empty');
+            }
+            return btoa(String.fromCharCode(...bytes));
+        };
+
+        const secureBase64ToArrayBuffer = (base64) => {
+            if (typeof base64 !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+                throw new Error('Invalid base64 string format');
+            }
+            try {
+                const binaryString = atob(base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes.buffer;
+            } catch (e) {
+                throw new Error('Invalid base64 encoding: ' + e.message);
+            }
+        };
+
+        const secureCanonicalJsonStringify = (value) => {
+            if (value === null || typeof value !== 'object') {
+                return JSON.stringify(value);
+            }
+            if (Array.isArray(value)) {
+                const parts = value.map(i => {
+                    const str = secureCanonicalJsonStringify(i);
+                    return str;
+                });
+                return '[' + parts.join(',') + ']';
+            }
+            if (value.toJSON && typeof value.toJSON === 'function') {
+                return JSON.stringify(value);
+            }
+            const keys = Object.keys(value).sort();
+            let result = '{';
+            let first = true;
+            for (const key of keys) {
+                const val = value[key];
+                if (val !== undefined) {
+                    if (!first) {
+                        result += ',';
+                    }
+                    const keyStr = JSON.stringify(key);
+                    const valStr = secureCanonicalJsonStringify(val);
+                    result += keyStr + ':' + valStr;
+                    first = false;
+                }
+            }
+            result += '}';
+            return result;
+        };
+
+        async function deriveSecretsFromKEMSharedSecret(sharedSecret, kemCiphertext) {
+            logStatus('Deriving keys from shared secret using HKDF-SHA256...');
+            const hkdfKey = await crypto.subtle.importKey(
+                'raw',
+                sharedSecret,
+                { name: 'HKDF' },
+                false,
+                ['deriveBits']
+            );
+
+            const hkdf_salt = await crypto.subtle.digest('SHA-256', kemCiphertext);
+
+            const infoEncoder = new TextEncoder();
+            const infoPrefix = infoEncoder.encode('v1-file-encryption');
+            const info = new Uint8Array(infoPrefix.length + kemCiphertext.length);
+            info.set(infoPrefix, 0);
+            info.set(kemCiphertext, infoPrefix.length);
+
+            const derivedBits = await crypto.subtle.deriveBits(
+                {
+                    name: 'HKDF',
+                    hash: 'SHA-256',
+                    salt: hkdf_salt,
+                    info: info
+                },
+                hkdfKey,
+                320
+            );
+
+            const derivedBytes = new Uint8Array(derivedBits);
+            const aesKeyBytes = derivedBytes.slice(0, 32);
+            const fileNonceBase = derivedBytes.slice(32, 40);
+            
+            derivedBytes.fill(0);
+
+            return { aesKeyBytes, fileNonceBase };
+        }
+
+        const timingSafeEqual = (a, b) => {
+            if (a.length !== b.length) return false;
+            let result = 0;
+            for (let i = 0; i < a.length; i++) {
+                result |= a[i] ^ b[i];
+            }
+            return result === 0;
+        };
+
+        const validatePassword = (password) => {
+            if (!password || typeof password !== 'string') return false;
+            if (password.length < MIN_PASSWORD_LENGTH) return false;
+            return true;
+        };
+
+        const sanitizeFilename = (filename) => {
+            if (!filename || typeof filename !== 'string') return 'encrypted_file.enc';
+            return filename.replace(/[<>:"|?*\x00-\x1f]/g, '_').slice(0, 255);
+        };
+
+        async function getPasswordDerivedKey(password, salt) {
+            if (!validatePassword(password)) {
+                throw new Error('Password must be at least ' + MIN_PASSWORD_LENGTH + ' characters long');
+            }
+            if (!salt || salt.length !== SALT_SIZE) {
+                throw new Error('Invalid salt length');
+            }
+            
+            let sanitizedPassword = password.normalize('NFKC');
+            
+            logStatus('Deriving key from password using Argon2id... This may take a moment.');
+            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 100 + 50))); 
+            
+            const argon2Options = { ...ARGON2_PARAMS, pass: sanitizedPassword, salt: salt };
+            const result = await argon2.hash(argon2Options);
+            let keyData = result.hash;
+            
+            // Clear password from memory
+            if (password.length > 0) {
+                sanitizedPassword = ' '.repeat(sanitizedPassword.length);
+            }
+            
+            if (typeof keyData === 'string') {
+                try {
+                    logStatus('Hash returned as string, decoding from base64...');
+                    keyData = base64ToArrayBuffer(keyData);
+                } catch (e) {
+                    console.error("Error decoding hash from string:", e);
+                    throw new Error('Failed to decode password-derived key hash from string.');
+                }
+            }
+            
+            const importedKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+            
+            if (keyData instanceof Uint8Array) {
+                keyData.fill(0);
+            }
+            if (result.hash instanceof Uint8Array) {
+                result.hash.fill(0);
+            }
+            
+            return importedKey;
+        }
+
+        async function aesGcmEncrypt(key, data, iv, additionalData = null) {
+            const params = { name: 'AES-GCM', iv };
+            if (additionalData) {
+                params.additionalData = additionalData;
+            }
+            const ciphertext = await crypto.subtle.encrypt(params, key, data);
+            return new Uint8Array(ciphertext);
+        }
+
+        async function aesGcmDecrypt(key, ciphertext, iv, additionalData = null) {
+            const params = { name: 'AES-GCM', iv };
+            if (additionalData) {
+                params.additionalData = additionalData;
+            }
+            const decrypted = await crypto.subtle.decrypt(params, key, ciphertext);
+            return new Uint8Array(decrypted);
+        }
+
+        function createEncryptionStream(key, fileNonceBase) {
+            let chunkIndex = 0;
+            const iv = new Uint8Array(IV_SIZE);
+            const counterBytes = new Uint8Array(4);
+            const counterView = new DataView(counterBytes.buffer);
+
+            return new TransformStream({
+                async transform(chunk, controller) {
+                    counterView.setUint32(0, chunkIndex++, false); // Use big-endian as per suggestion be32
+                    iv.set(fileNonceBase, 0);
+                    iv.set(counterBytes, 8);
+
+                    const encryptedChunk = await aesGcmEncrypt(key, chunk, iv);
+
+                    const lengthBuffer = new ArrayBuffer(4);
+                    new DataView(lengthBuffer).setUint32(0, encryptedChunk.length, true);
+
+                    controller.enqueue(new Uint8Array(lengthBuffer));
+                    controller.enqueue(encryptedChunk);
+                }
+            });
+        }
+
+        function createDecryptionStream(key, fileNonceBase) {
+            let buffer = new Uint8Array(0);
+            let chunkIndex = 0;
+            const iv = new Uint8Array(IV_SIZE);
+            const counterBytes = new Uint8Array(4);
+            const counterView = new DataView(counterBytes.buffer);
+
+            return new TransformStream({
+                async transform(chunk, controller) {
+                    const newBuffer = new Uint8Array(buffer.length + chunk.length);
+                    newBuffer.set(buffer);
+                    newBuffer.set(chunk, buffer.length);
+                    buffer = newBuffer;
+
+                    while (true) {
+                        if (buffer.length < 4) break;
+
+                        const ciphertextLength = new DataView(buffer.buffer, buffer.byteOffset).getUint32(0, true);
+                        const requiredLength = 4 + ciphertextLength;
+
+                        if (buffer.length < requiredLength) break;
+
+                        const data = buffer.slice(4, requiredLength);
+                        buffer = buffer.slice(requiredLength);
+
+                        counterView.setUint32(0, chunkIndex++, false); // big-endian
+                        iv.set(fileNonceBase, 0);
+                        iv.set(counterBytes, 8);
+
+                        try {
+                            const decryptedChunk = await aesGcmDecrypt(key, data, iv);
+                            controller.enqueue(decryptedChunk);
+                        } catch (e) {
+                            console.error("Chunk decryption error:", e);
+                            controller.error(new Error("Decryption failed. Incorrect password or corrupt chunk."));
+                            return;
+                        }
+                    }
+                },
+                flush(controller) {
+                    if (buffer.length > 0) {
+                        controller.error(new Error("Corrupted file: trailing data detected."));
+                    }
+                }
+            });
+        }
+
+        const handleEncrypt = async () => {
+            if (encryptPasswordInput.type === 'text') {
+                encryptPasswordInput.type = 'password';
+                document.getElementById('eye-encrypt-icon').classList.remove('hidden');
+                document.getElementById('eye-off-encrypt-icon').classList.add('hidden');
+            }
+            if (!encryptFile || !encryptPasswordInput.value) {
+                logStatus('Please select a file and enter a valid password.', 'error');
+                return;
+            }
+            
+            // Validate password strength early
+            
+            if (!validatePassword(encryptPasswordInput.value)) {
+                logStatus('Password must be at least ' + MIN_PASSWORD_LENGTH + ' characters long.', 'error');
+                return;
+            }
+            
+            const encryptFileLabel = document.querySelector('label.file-input-label[for="encrypt-file-input"]');
+            showSpinner(true, encryptBtn, encryptSpinner, encryptBtnText);
+            encryptFileLabel.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+            encryptFileInput.disabled = true;
+            encryptTabBtn.disabled = true;
+            decryptTabBtn.disabled = true;
+            encryptTabBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            decryptTabBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            let secretKey, sharedSecret, aesKeyBytes;
+
+            try {
+                logStatus('Starting hybrid encryption...');
+                const kem = new MlKem768();
+                const [publicKey, sk] = await kem.generateKeyPair();
+                secretKey = new Uint8Array(sk);
+                logStatus('Key pair generated.');
+
+                const [kemCiphertext, ss] = await kem.encap(publicKey);
+                sharedSecret = new Uint8Array(ss);
+
+                const { aesKeyBytes: derivedAesKeyBytes, fileNonceBase } = await deriveSecretsFromKEMSharedSecret(sharedSecret, kemCiphertext);
+                aesKeyBytes = new Uint8Array(derivedAesKeyBytes);
+                sharedSecret.fill(0);
+
+                const fileAesKey = await crypto.subtle.importKey('raw', aesKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+                aesKeyBytes.fill(0);
+                logStatus('File encryption key derived via HKDF.');
+
+                const salt = crypto.getRandomValues(new Uint8Array(SALT_SIZE));
+                const passwordKey = await getPasswordDerivedKey(encryptPasswordInput.value, salt);
+                
+                const iv_for_sk = crypto.getRandomValues(new Uint8Array(IV_SIZE));
+                
+                        // Sanitize filename
+                
+                const sanitizedFilename = sanitizeFilename(encryptFile.name);
+                
+                const headerDataForAAD = {
+                    alg: 'v1-stream',
+                    enc: 'ML-KEM-768',
+                    kdf: 'Argon2id',
+                    kdfParams: { t: ARGON2_PARAMS.time, m: ARGON2_PARAMS.mem, p: ARGON2_PARAMS.parallelism },
+                    salt: secureArrayBufferToBase64(salt.buffer),
+                    kem_ct: secureArrayBufferToBase64(kemCiphertext.buffer),
+                    file_nonce_base: secureArrayBufferToBase64(fileNonceBase.buffer),
+                    chunkSize: CHUNK_SIZE,
+                    orig_name: sanitizeFilename(encryptFile.name)
+                };
+                
+                const headerStringForAAD = secureCanonicalJsonStringify(headerDataForAAD);
+                const headerBytesForAAD = new TextEncoder().encode(headerStringForAAD);
+
+                logStatus('Protecting secret key with password (AAD header)...');
+                const encrypted_sk = await aesGcmEncrypt(passwordKey, secretKey, iv_for_sk, headerBytesForAAD);
+                secretKey.fill(0);
+                logStatus('Secret key protected with password.');
+
+                const finalHeaderData = { ...headerDataForAAD, sk_iv: secureArrayBufferToBase64(iv_for_sk.buffer) };
+                const finalHeaderString = secureCanonicalJsonStringify(finalHeaderData);
+                const finalHeaderBytes = new TextEncoder().encode(finalHeaderString);
+                if (finalHeaderBytes.length > 65536) {
+                    throw new Error('Header too large');
+                }
+                
+                const headerLengthBuffer = new ArrayBuffer(4);
+                new DataView(headerLengthBuffer).setUint32(0, finalHeaderBytes.length, true);
+
+                const encryptedSkLengthBuffer = new ArrayBuffer(4);
+                new DataView(encryptedSkLengthBuffer).setUint32(0, encrypted_sk.length, true);
+                if (encrypted_sk.length > 65536) {
+                    throw new Error('Encrypted key too large');
+                }
+
+                logStatus('Streaming encryption to file... Please keep the page open until the download completes.');
+                const fileStream = encryptFile.stream().pipeThrough(new TransformStream({
+                    transform(chunk, controller) { controller.enqueue(chunk); },
+                }, { highWaterMark: 1, size: () => CHUNK_SIZE }));
+                
+                const encryptionStream = createEncryptionStream(fileAesKey, fileNonceBase);
+                const encryptedFileStream = fileStream.pipeThrough(encryptionStream);
+
+                const finalFileName = sanitizedFilename + '.enc';
+                const fileWriter = streamSaver.createWriteStream(finalFileName).getWriter();
+
+                await fileWriter.write(new Uint8Array(headerLengthBuffer));
+                await fileWriter.write(finalHeaderBytes);
+                await fileWriter.write(new Uint8Array(encryptedSkLengthBuffer));
+                await fileWriter.write(encrypted_sk);
+
+                const reader = encryptedFileStream.getReader();
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    await fileWriter.write(value);
+                }
+                await fileWriter.close();
+
+                logStatus(`Success! File encrypted and saved as ${finalFileName}`, 'success');
+
+            } catch (err) {
+                console.error('Encryption failed:', err);
+                const errorMessage = sanitizeForDisplay(err.message || 'Encryption failed. Please try again.');
+                logStatus(errorMessage, 'error');
+            } finally {
+                if (secretKey) secretKey.fill(0);
+                if (sharedSecret) sharedSecret.fill(0);
+                if (aesKeyBytes) aesKeyBytes.fill(0);
+
+                showSpinner(false, encryptBtn, encryptSpinner, encryptBtnText);
+                encryptFileLabel.classList.remove('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+                encryptFileInput.disabled = false;
+                encryptTabBtn.disabled = false;
+                decryptTabBtn.disabled = false;
+                encryptTabBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                decryptTabBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                
+                // Clear password from input field
+                encryptPasswordInput.value = ' '.repeat(encryptPasswordInput.value.length);
+                encryptPasswordInput.value = '';
+            }
+        };
+
+        const handleDecrypt = async () => {
+            if (decryptPasswordInput.type === 'text') {
+                decryptPasswordInput.type = 'password';
+                document.getElementById('eye-decrypt-icon').classList.remove('hidden');
+                document.getElementById('eye-off-decrypt-icon').classList.add('hidden');
+            }
+            if (!decryptFile || !decryptPasswordInput.value) {
+                logStatus('Please select a valid .enc file and enter a password.', 'error');
+                return;
+            }
+            
+            // Validate file extension and size early
+            if (!decryptFile.name.toLowerCase().endsWith('.enc')) {
+                logStatus('Invalid file type. Only .enc files are supported.', 'error');
+                return;
+            }
+            
+
+
+            const decryptFileLabel = document.querySelector('label.file-input-label[for="decrypt-file-input"]');
+            showSpinner(true, decryptBtn, decryptSpinner, decryptBtnText);
+            decryptFileLabel.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+            decryptFileInput.disabled = true;
+            encryptTabBtn.disabled = true;
+            decryptTabBtn.disabled = true;
+            encryptTabBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            decryptTabBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            let streamReader;
+            let kyber_sk, sharedSecret, aesKeyBytes;
+
+            try {
+                logStatus('Starting hybrid decryption...');
+                const fileStream = decryptFile.stream();
+                streamReader = fileStream.getReader();
+                let internalBuffer = new Uint8Array(0);
+
+                async function readNextBytes(numBytes) {
+                    while (internalBuffer.length < numBytes) {
+                        const { value, done } = await streamReader.read();
+                        if (done) {
+                            throw new Error(`File ended unexpectedly. Wanted ${numBytes} bytes, but stream ended.`);
+                        }
+                        const newBuffer = new Uint8Array(internalBuffer.length + value.length);
+                        newBuffer.set(internalBuffer);
+                        newBuffer.set(value, internalBuffer.length);
+                        internalBuffer = newBuffer;
+                    }
+                    const result = internalBuffer.slice(0, numBytes);
+                    internalBuffer = internalBuffer.slice(numBytes);
+                    return result;
+                }
+                
+                logStatus('Reading file header...');
+                const headerLengthBytes = await readNextBytes(4);
+                const headerLength = new DataView(headerLengthBytes.buffer).getUint32(0, true);
+                if (headerLength > 65536 || headerLength < 10) {
+                    throw new Error('Invalid header length');
+                }
+                const headerBytes = await readNextBytes(headerLength);
+                const headerString = new TextDecoder().decode(headerBytes);
+                const header = JSON.parse(headerString);
+                
+                if (!header || typeof header !== 'object') {
+                    throw new Error('Invalid header format');
+                }
+
+                if (!header.alg || header.alg !== 'v1-stream') {
+                    throw new Error('Invalid or unsupported file format.');
+                }
+                
+                // Validate all required header fields
+                const requiredFields = ['salt', 'kem_ct', 'sk_iv', 'file_nonce_base', 'kdfParams'];
+                for (const field of requiredFields) {
+                    if (!header[field]) {
+                        throw new Error('Missing header field: ' + field);
+                    }
+                }
+                
+                // Validate KDF parameters to prevent parameter injection
+                const kdfParams = header.kdfParams;
+                if (!kdfParams || typeof kdfParams !== 'object' ||
+                    !Number.isInteger(kdfParams.t) || kdfParams.t < 1 || kdfParams.t > 1000 ||
+                    !Number.isInteger(kdfParams.m) || kdfParams.m < 1024 || kdfParams.m > 1048576 ||
+                    !Number.isInteger(kdfParams.p) || kdfParams.p < 1 || kdfParams.p > 64) {
+                    throw new Error('Invalid KDF parameters');
+                }
+
+                const salt = new Uint8Array(secureBase64ToArrayBuffer(header.salt));
+                const kem_ct = new Uint8Array(secureBase64ToArrayBuffer(header.kem_ct));
+                const iv_for_sk = new Uint8Array(secureBase64ToArrayBuffer(header.sk_iv));
+                
+                const encryptedSkLengthBytes = await readNextBytes(4);
+                const encryptedSkLength = new DataView(encryptedSkLengthBytes.buffer).getUint32(0, true);
+                if (encryptedSkLength > 65536 || encryptedSkLength < 16) {
+                    throw new Error('Invalid encrypted key length');
+                }
+                const encrypted_sk = await readNextBytes(encryptedSkLength);
+
+                logStatus('Deriving key from password...');
+                const passwordKey = await getPasswordDerivedKey(decryptPasswordInput.value, salt);
+                
+                logStatus('Decrypting secret key (verifying header)...');
+                const headerForAAD = { ...header };
+                delete headerForAAD.sk_iv;
+                const headerBytesForAAD = new TextEncoder().encode(secureCanonicalJsonStringify(headerForAAD));
+                
+                const decrypted_sk = await aesGcmDecrypt(passwordKey, encrypted_sk, iv_for_sk, headerBytesForAAD);
+                kyber_sk = new Uint8Array(decrypted_sk);
+
+                logStatus('Recovering shared secret...');
+                const kem = new MlKem768();
+                const ss = await kem.decap(kem_ct, kyber_sk);
+                sharedSecret = new Uint8Array(ss);
+                kyber_sk.fill(0);
+
+                const { aesKeyBytes: derivedAesKeyBytes, fileNonceBase: derivedFileNonceBase } = await deriveSecretsFromKEMSharedSecret(sharedSecret, kem_ct);
+                aesKeyBytes = new Uint8Array(derivedAesKeyBytes);
+                sharedSecret.fill(0);
+
+                const headerFileNonceBase = new Uint8Array(secureBase64ToArrayBuffer(header.file_nonce_base));
+                const noncesMatch = timingSafeEqual(derivedFileNonceBase, headerFileNonceBase);
+
+                derivedFileNonceBase.fill(0);
+                if (!noncesMatch) {
+                    throw new Error("Derived nonce base does not match header. File may be corrupt or tampered with.");
+                }
+
+                const aesKey = await crypto.subtle.importKey('raw', aesKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
+                aesKeyBytes.fill(0);
+                logStatus('File decryption key derived via HKDF.');
+
+                logStatus('Streaming decryption to file... Please keep the page open until the download completes.');
+                const decryptionStream = createDecryptionStream(aesKey, headerFileNonceBase);
+                const originalFileName = sanitizeFilename(header.orig_name || (decryptFile.name.endsWith('.enc') ? decryptFile.name.slice(0, -4) : 'decrypted_file'));
+                
+                const fileWriter = streamSaver.createWriteStream(originalFileName);
+
+                const remainingStream = new ReadableStream({
+                    async pull(controller) {
+                        if (internalBuffer.length > 0) {
+                            controller.enqueue(internalBuffer);
+                            internalBuffer = new Uint8Array(0);
+                        }
+                        const { value, done } = await streamReader.read();
+                        if (done) {
+                            controller.close();
+                            return;
+                        }
+                        controller.enqueue(value);
+                    }
+                });
+                
+                await remainingStream
+                    .pipeThrough(decryptionStream)
+                    .pipeTo(fileWriter)
+                    .catch(error => {
+                        if (streamReader) {
+                            streamReader.cancel().catch(e => console.error("Failed to cancel stream reader:", e));
+                        }
+                        throw error;
+                    });
+
+                logStatus(`Success! File decrypted and saved as ${originalFileName}.`, 'success');
+
+            } catch (err) {
+                console.error('Decryption failed:', err);
+                const errorMessage = sanitizeForDisplay(err.message || 'Decryption failed: Check password or file integrity.');
+                logStatus(errorMessage, 'error');
+                if (streamReader) {
+                    streamReader.cancel().catch(e => console.error("Failed to cancel stream reader:", e));
+                }
+            } finally {
+                if (kyber_sk) kyber_sk.fill(0);
+                if (sharedSecret) sharedSecret.fill(0);
+                if (aesKeyBytes) aesKeyBytes.fill(0);
+
+                showSpinner(false, decryptBtn, decryptSpinner, decryptBtnText);
+                decryptFileLabel.classList.remove('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+                decryptFileInput.disabled = false;
+                encryptTabBtn.disabled = false;
+                decryptTabBtn.disabled = false;
+                encryptTabBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                decryptTabBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                decryptPasswordInput.value = '';
+            }
+        };
+        
+        encryptTabBtn.addEventListener('click', () => switchTab('encrypt'));
+        decryptTabBtn.addEventListener('click', () => switchTab('decrypt'));
+        
+        encryptFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                encryptFile = e.target.files[0];
+                encryptFileName.textContent = encryptFile.name;
+                logStatus(`Selected for encryption: ${encryptFile.name}`);
+            }
+        });
+        
+        decryptFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                decryptFile = e.target.files[0];
+                decryptFileName.textContent = decryptFile.name;
+                logStatus(`Selected for decryption: ${decryptFile.name}`);
+            }
+        });
+        
+        encryptBtn.addEventListener('click', handleEncrypt);
+        decryptBtn.addEventListener('click', handleDecrypt);
+        
+        toggleEncryptPasswordBtn.addEventListener('click', () => {
+            togglePasswordVisibility(
+                encryptPasswordInput,
+                document.getElementById('eye-encrypt-icon'),
+                document.getElementById('eye-off-encrypt-icon')
+            );
+        });
+
+        toggleDecryptPasswordBtn.addEventListener('click', () => {
+            togglePasswordVisibility(
+                decryptPasswordInput,
+                document.getElementById('eye-decrypt-icon'),
+                document.getElementById('eye-off-decrypt-icon')
+            );
+        });
+
+        encryptPasswordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (!encryptBtn.disabled) {
+                    encryptBtn.click();
+                }
+            }
+        });
+
+        decryptPasswordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (!decryptBtn.disabled) {
+                    decryptBtn.click();
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>
