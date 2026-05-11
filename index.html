@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; worker-src 'self';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta name="referrer" content="no-referrer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <title>Enc - Secure File Encryption</title>
+    <script src="./tailwindcss.js"></script>
+    <script src="./argon2-bundled.min.js"></script>
+    <script src="./StreamSaver.min.js"></script>
+    <link href="./fonts/fonts.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #000000;
+            color: #ffffff;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        .flat-border {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab-active {
+            color: #ffffff;
+            border-bottom: 2px solid #ffffff;
+        }
+
+        .file-zone-hover {
+            border-color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        .file-zone-has-file-encrypt, .file-zone-has-file-decrypt {
+            border-color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin 3s linear infinite;
+        }
+
+        /* Custom scrollbar for status box */
+        #status-area::-webkit-scrollbar {
+            width: 2px;
+        }
+        #status-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #status-area::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .app-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        .workspace-card {
+            width: 100%;
+            max-width: 30rem;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #000;
+        }
+
+        .log-section {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.02);
+        }
+
+        #status-area {
+            height: 8rem;
+            overflow-y: auto;
+            padding: 0.75rem 1rem;
+        }
+    </style>
+</head>
+<body class="bg-black text-white selection:bg-white/20">
+    <div class="app-container">
+        <!-- Logo/Header -->
+        <div class="mb-8 text-center flex-shrink-0">
+            <h1 class="text-4xl font-light tracking-tighter text-white mb-1">ENC</h1>
+            <p class="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">Post-Quantum Security</p>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="workspace-card">
+            <!-- Tab Switcher -->
+            <div class="flex border-b border-white/10">
+                <button id="encrypt-tab-btn" class="flex-1 py-4 text-[11px] font-bold uppercase tracking-widest transition-all duration-200 tab-active disabled:opacity-20 disabled:cursor-not-allowed">
+                    Encrypt
+                </button>
+                <button id="decrypt-tab-btn" class="flex-1 py-4 text-[11px] font-bold uppercase tracking-widest transition-all duration-200 text-white/40 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed">
+                    Decrypt
+                </button>
+            </div>
+
+            <div>
+                <!-- Inputs Section -->
+                <div class="p-8 space-y-8">
+                    <div id="main-content">
+                        <!-- Encrypt Tab -->
+                        <div id="encrypt-tab" class="space-y-8 transition-all duration-300">
+                            <div class="space-y-3">
+                                <label class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ml-1">Input File</label>
+                                <input type="file" id="encrypt-file-input" class="hidden">
+                                <label for="encrypt-file-input" id="encrypt-drop-zone" class="group relative flex flex-col items-center justify-center py-10 border border-white/10 cursor-pointer hover:border-white transition-all duration-200">
+                                    <span class="text-[11px] font-bold uppercase tracking-widest text-white/60 group-hover:text-white">Select File</span>
+                                    <span class="text-[10px] text-white/20 mt-1 uppercase tracking-tighter">Drag & Drop</span>
+                                </label>
+                                <p id="encrypt-file-name" class="text-[10px] text-center text-white/40 truncate px-4 tracking-wider">No file selected</p>
+                            </div>
+
+                            <div class="space-y-3">
+                                <label for="encrypt-password" class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ml-1">Password</label>
+                                <div class="relative group">
+                                    <input type="password" id="encrypt-password" class="w-full bg-black border border-white/10 px-4 py-4 text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-white transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed" placeholder="Minimum 8 characters">
+                                    <button type="button" id="toggle-encrypt-password-btn" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors">
+                                        <svg id="eye-encrypt-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        <svg id="eye-off-encrypt-icon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button id="encrypt-btn" class="group relative w-full border border-white text-white font-bold text-[11px] uppercase tracking-[0.3em] py-5 hover:bg-white hover:text-black transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center">
+                                <div id="encrypt-spinner" class="absolute inset-0 flex items-center justify-center hidden">
+                                    <svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                </div>
+                                <span id="encrypt-btn-text">Encrypt</span>
+                            </button>
+                        </div>
+
+                        <!-- Decrypt Tab -->
+                        <div id="decrypt-tab" class="hidden space-y-8 transition-all duration-300">
+                            <div class="space-y-3">
+                                <label class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ml-1">Encrypted File</label>
+                                <input type="file" id="decrypt-file-input" class="hidden" accept=".enc">
+                                <label for="decrypt-file-input" id="decrypt-drop-zone" class="group relative flex flex-col items-center justify-center py-10 border border-white/10 cursor-pointer hover:border-white transition-all duration-200">
+                                    <span class="text-[11px] font-bold uppercase tracking-widest text-white/60 group-hover:text-white">Select .enc</span>
+                                    <span class="text-[10px] text-white/20 mt-1 uppercase tracking-tighter">Drag & Drop</span>
+                                </label>
+                                <p id="decrypt-file-name" class="text-[10px] text-center text-white/40 truncate px-4 tracking-wider">No file selected</p>
+                            </div>
+
+                            <div class="space-y-3">
+                                <label for="decrypt-password" class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ml-1">Password</label>
+                                <div class="relative group">
+                                    <input type="password" id="decrypt-password" class="w-full bg-black border border-white/10 px-4 py-4 text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-white transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed" placeholder="Enter original password">
+                                    <button type="button" id="toggle-decrypt-password-btn" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors">
+                                        <svg id="eye-decrypt-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        <svg id="eye-off-decrypt-icon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button id="decrypt-btn" class="group relative w-full border border-white text-white font-bold text-[11px] uppercase tracking-[0.3em] py-5 hover:bg-white hover:text-black transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center">
+                                <div id="decrypt-spinner" class="absolute inset-0 flex items-center justify-center hidden">
+                                    <svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                </div>
+                                <span id="decrypt-btn-text">Decrypt</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Console -->
+                <div class="log-section">
+                    <div class="flex items-center gap-3 p-3">
+                        <span class="text-[9px] font-bold uppercase tracking-[0.4em] text-white/30">Log</span>
+                        <div class="flex-1 h-[1px] bg-white/5"></div>
+                    </div>
+                    <div id="status-area" class="font-mono text-[10px] leading-relaxed text-white/30 selection:bg-white/10">
+                        <div class="text-white/60">SYS_READY :: WAITING_FOR_INPUT</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer Info -->
+        <div class="mt-12 flex flex-wrap justify-center gap-8 text-[9px] font-bold uppercase tracking-[0.3em] text-white/10 flex-shrink-0">
+            <span>AES-256-GCM</span>
+            <span>ARGON2ID</span>
+            <span class="text-white/20">ML-KEM-768</span>
+        </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "mlkem": "./mlkem.js"
+        }
+      }
+    </script>
+    <script type="module">
+        import { MlKem768 } from 'mlkem';
+
+        const encryptTabBtn = document.getElementById('encrypt-tab-btn');
+        const decryptTabBtn = document.getElementById('decrypt-tab-btn');
+        const encryptTab = document.getElementById('encrypt-tab');
+        const decryptTab = document.getElementById('decrypt-tab');
+        const encryptFileInput = document.getElementById('encrypt-file-input');
+        const encryptFileName = document.getElementById('encrypt-file-name');
+        const encryptPasswordInput = document.getElementById('encrypt-password');
+        const encryptBtn = document.getElementById('encrypt-btn');
+        const decryptFileInput = document.getElementById('decrypt-file-input');
+        const decryptFileName = document.getElementById('decrypt-file-name');
+        const decryptPasswordInput = document.getElementById('decrypt-password');
+        const decryptBtn = document.getElementById('decrypt-btn');
+        const statusArea = document.getElementById('status-area');
+        const toggleEncryptPasswordBtn = document.getElementById('toggle-encrypt-password-btn');
+        const toggleDecryptPasswordBtn = document.getElementById('toggle-decrypt-password-btn');
+        const eyeEncryptIcon = document.getElementById('eye-encrypt-icon');
+        const eyeOffEncryptIcon = document.getElementById('eye-off-encrypt-icon');
+        const eyeDecryptIcon = document.getElementById('eye-decrypt-icon');
+        const eyeOffDecryptIcon = document.getElementById('eye-off-decrypt-icon');
+        const encryptSpinner = document.getElementById('encrypt-spinner');
+        const encryptBtnText = document.getElementById('encrypt-btn-text');
+        const decryptSpinner = document.getElementById('decrypt-spinner');
+        const decryptBtnText = document.getElementById('decrypt-btn-text');
+        
+        let encryptFile = null;
+        let decryptFile = null;
+
+        const SALT_SIZE = 64;
+        const IV_SIZE = 12;
+        const CHUNK_SIZE = 1024 * 1024 * 4;
+
+        const MIN_PASSWORD_LENGTH = 8;
+
+        const ARGON2_PARAMS = {
+            time: 32,
+            mem: 131072,
+            parallelism: 4,
+            hashLen: 32,
+            type: argon2.ArgonType.Argon2id
+        };
+
+        const sanitizeForDisplay = (str) => {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        };
+
+        const clearStatus = () => {
+            statusArea.innerHTML = '';
+        };
+
+        const logStatus = (message, type = 'info') => {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            const colorClass = type === 'error' ? 'text-red-500' : type === 'success' ? 'text-white' : type === 'warn' ? 'text-white/60' : 'text-white/40';
+            const entry = document.createElement('div');
+            entry.className = colorClass;
+            entry.innerHTML = `<span class="opacity-20 mr-2">[${new Date().toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'})}]</span>${sanitizeForDisplay(message)}`;
+            statusArea.appendChild(entry);
+            statusArea.scrollTop = statusArea.scrollHeight;
+        };
+        
+        const switchTab = (tabName) => {
+            const isEncrypt = tabName === 'encrypt';
+
+            encryptTab.classList.toggle('hidden', !isEncrypt);
+            decryptTab.classList.toggle('hidden', isEncrypt);
+            
+            encryptTabBtn.classList.toggle('tab-active', isEncrypt);
+            encryptTabBtn.classList.toggle('text-white/40', !isEncrypt);
+            
+            decryptTabBtn.classList.toggle('tab-active', !isEncrypt);
+            decryptTabBtn.classList.toggle('text-white/40', isEncrypt);
+            
+            logStatus(`MODE :: ${isEncrypt ? 'ENCRYPTION' : 'DECRYPTION'}`);
+        };
+        
+        const togglePasswordVisibility = (passwordInput, eyeIcon, eyeOffIcon) => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            eyeIcon.classList.toggle('hidden', isPassword);
+            eyeOffIcon.classList.toggle('hidden', !isPassword);
+        };
+
+        const resetPasswordVisibility = (passwordInput, eyeIcon, eyeOffIcon) => {
+            passwordInput.type = 'password';
+            eyeIcon.classList.remove('hidden');
+            eyeOffIcon.classList.add('hidden');
+        };
+
+        const showSpinner = (isSpinning, button, spinner, text, toggleBtn) => {
+            button.disabled = isSpinning;
+            spinner.classList.toggle('hidden', !isSpinning);
+            text.classList.toggle('invisible', isSpinning);
+            if (toggleBtn) toggleBtn.classList.toggle('hidden', isSpinning);
+        };
+
+        const setProcessingState = (isProcessing) => {
+            const elements = [
+                encryptTabBtn, decryptTabBtn,
+                encryptPasswordInput, decryptPasswordInput,
+                encryptBtn, decryptBtn,
+                toggleEncryptPasswordBtn, toggleDecryptPasswordBtn
+            ];
+            
+            elements.forEach(el => {
+                if (el) el.disabled = isProcessing;
+            });
+
+            [encryptDropZone, decryptDropZone].forEach(zone => {
+                if (zone) {
+                    zone.style.pointerEvents = isProcessing ? 'none' : 'auto';
+                    zone.classList.toggle('opacity-20', isProcessing);
+                }
+            });
+        };
+
+        const secureArrayBufferToBase64 = (buffer) => {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        };
+
+        const secureBase64ToArrayBuffer = (base64) => {
+            const binaryString = atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        };
+
+        const secureCanonicalJsonStringify = (value) => {
+            if (value === null || typeof value !== 'object') {
+                return JSON.stringify(value);
+            }
+            if (Array.isArray(value)) {
+                return '[' + value.map(i => secureCanonicalJsonStringify(i)).join(',') + ']';
+            }
+            const keys = Object.keys(value).sort();
+            let result = '{';
+            let first = true;
+            for (const key of keys) {
+                const val = value[key];
+                if (val !== undefined) {
+                    if (!first) result += ',';
+                    result += JSON.stringify(key) + ':' + secureCanonicalJsonStringify(val);
+                    first = false;
+                }
+            }
+            result += '}';
+            return result;
+        };
+
+        async function deriveSecretsFromKEMSharedSecret(sharedSecret, kemCiphertext) {
+            logStatus('Deriving session keys (HKDF-SHA256)...');
+            const hkdfKey = await crypto.subtle.importKey(
+                'raw',
+                sharedSecret,
+                { name: 'HKDF' },
+                false,
+                ['deriveBits']
+            );
+
+            const hkdf_salt = await crypto.subtle.digest('SHA-256', kemCiphertext);
+            const infoEncoder = new TextEncoder();
+            const infoPrefix = infoEncoder.encode('v1-file-encryption');
+            const info = new Uint8Array(infoPrefix.length + kemCiphertext.length);
+            info.set(infoPrefix, 0);
+            info.set(kemCiphertext, infoPrefix.length);
+
+            const derivedBits = await crypto.subtle.deriveBits(
+                { name: 'HKDF', hash: 'SHA-256', salt: hkdf_salt, info: info },
+                hkdfKey,
+                320
+            );
+
+            const derivedBytes = new Uint8Array(derivedBits);
+            const aesKeyBytes = derivedBytes.slice(0, 32);
+            const fileNonceBase = derivedBytes.slice(32, 40);
+            derivedBytes.fill(0);
+
+            return { aesKeyBytes, fileNonceBase };
+        }
+
+        const timingSafeEqual = (a, b) => {
+            if (a.length !== b.length) return false;
+            let result = 0;
+            for (let i = 0; i < a.length; i++) result |= a[i] ^ b[i];
+            return result === 0;
+        };
+
+        const validatePassword = (password) => {
+            return password && typeof password === 'string' && password.length >= MIN_PASSWORD_LENGTH;
+        };
+
+        const sanitizeFilename = (filename) => {
+            if (!filename || typeof filename !== 'string') return 'file.enc';
+            return filename.replace(/[<>:"|?*\x00-\x1f]/g, '_').slice(0, 255);
+        };
+
+        async function getPasswordDerivedKey(password, salt) {
+            if (!validatePassword(password)) throw new Error('Password too short');
+            
+            let sanitizedPassword = password.normalize('NFKC');
+            logStatus('Computing Argon2id proof-of-work...');
+
+            const argon2Options = { ...ARGON2_PARAMS, pass: sanitizedPassword, salt: salt };
+            const result = await argon2.hash(argon2Options);
+            let keyData = result.hash;
+            
+            if (typeof keyData === 'string') keyData = secureBase64ToArrayBuffer(keyData);
+            
+            const importedKey = await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+            if (keyData instanceof Uint8Array) keyData.fill(0);
+            return importedKey;
+        }
+
+        async function aesGcmEncrypt(key, data, iv, additionalData = null) {
+            const params = { name: 'AES-GCM', iv };
+            if (additionalData) params.additionalData = additionalData;
+            return new Uint8Array(await crypto.subtle.encrypt(params, key, data));
+        }
+
+        async function aesGcmDecrypt(key, ciphertext, iv, additionalData = null) {
+            const params = { name: 'AES-GCM', iv };
+            if (additionalData) params.additionalData = additionalData;
+            return new Uint8Array(await crypto.subtle.decrypt(params, key, ciphertext));
+        }
+
+        function createEncryptionStream(key, fileNonceBase) {
+            let chunkIndex = 0;
+            const iv = new Uint8Array(IV_SIZE);
+            const counterBytes = new Uint8Array(4);
+            const counterView = new DataView(counterBytes.buffer);
+
+            return new TransformStream({
+                async transform(chunk, controller) {
+                    counterView.setUint32(0, chunkIndex++, false);
+                    iv.set(fileNonceBase, 0);
+                    iv.set(counterBytes, 8);
+
+                    const encryptedChunk = await aesGcmEncrypt(key, chunk, iv);
+                    const lengthBuffer = new ArrayBuffer(4);
+                    new DataView(lengthBuffer).setUint32(0, encryptedChunk.length, true);
+
+                    controller.enqueue(new Uint8Array(lengthBuffer));
+                    controller.enqueue(encryptedChunk);
+                }
+            });
+        }
+
+        function createDecryptionStream(key, fileNonceBase, expectedSize) {
+            let buffer = new Uint8Array(0);
+            let chunkIndex = 0;
+            let decryptedBytesCount = 0;
+            const iv = new Uint8Array(IV_SIZE);
+            const counterBytes = new Uint8Array(4);
+            const counterView = new DataView(counterBytes.buffer);
+
+            return new TransformStream({
+                async transform(chunk, controller) {
+                    const newBuffer = new Uint8Array(buffer.length + chunk.length);
+                    newBuffer.set(buffer);
+                    newBuffer.set(chunk, buffer.length);
+                    buffer = newBuffer;
+
+                    while (buffer.length >= 4) {
+                        const ciphertextLength = new DataView(buffer.buffer, buffer.byteOffset).getUint32(0, true);
+                        const requiredLength = 4 + ciphertextLength;
+                        if (buffer.length < requiredLength) break;
+
+                        const data = buffer.slice(4, requiredLength);
+                        buffer = buffer.slice(requiredLength);
+
+                        counterView.setUint32(0, chunkIndex++, false);
+                        iv.set(fileNonceBase, 0);
+                        iv.set(counterBytes, 8);
+
+                        try {
+                            const decrypted = await aesGcmDecrypt(key, data, iv);
+                            decryptedBytesCount += decrypted.length;
+                            controller.enqueue(decrypted);
+                        } catch (e) {
+                            controller.error(new Error("Decryption failed. Invalid password or data."));
+                            return;
+                        }
+                    }
+                },
+                flush(controller) {
+                    if (buffer.length > 0) {
+                        controller.error(new Error("Corrupted data."));
+                    } else if (expectedSize !== undefined && decryptedBytesCount !== expectedSize) {
+                        controller.error(new Error("File truncated."));
+                    }
+                }
+            });
+        }
+
+        const handleEncrypt = async () => {
+            if (!encryptFile || !validatePassword(encryptPasswordInput.value)) {
+                logStatus('Missing file or password (min 8 chars).', 'error');
+                return;
+            }
+
+            clearStatus();
+            setProcessingState(true);
+            resetPasswordVisibility(encryptPasswordInput, eyeEncryptIcon, eyeOffEncryptIcon);
+            showSpinner(true, encryptBtn, encryptSpinner, encryptBtnText, toggleEncryptPasswordBtn);
+            
+            let secretKey, sharedSecret, aesKeyBytes;
+
+            try {
+                logStatus('Initializing ML-KEM-768 engine...');
+                const kem = new MlKem768();
+                const [publicKey, sk] = await kem.generateKeyPair();
+                secretKey = new Uint8Array(sk);
+
+                const [kemCiphertext, ss] = await kem.encap(publicKey);
+                sharedSecret = new Uint8Array(ss);
+
+                const { aesKeyBytes: derivedAesKeyBytes, fileNonceBase } = await deriveSecretsFromKEMSharedSecret(sharedSecret, kemCiphertext);
+                aesKeyBytes = new Uint8Array(derivedAesKeyBytes);
+                sharedSecret.fill(0);
+
+                const fileAesKey = await crypto.subtle.importKey('raw', aesKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+                aesKeyBytes.fill(0);
+
+                const salt = crypto.getRandomValues(new Uint8Array(SALT_SIZE));
+                const passwordKey = await getPasswordDerivedKey(encryptPasswordInput.value, salt);
+                const iv_for_sk = crypto.getRandomValues(new Uint8Array(IV_SIZE));
+                
+                const headerDataForAAD = {
+                    alg: 'v1-stream', enc: 'ML-KEM-768', kdf: 'Argon2id',
+                    kdfParams: { t: ARGON2_PARAMS.time, m: ARGON2_PARAMS.mem, p: ARGON2_PARAMS.parallelism },
+                    salt: secureArrayBufferToBase64(salt.buffer),
+                    kem_ct: secureArrayBufferToBase64(kemCiphertext.buffer),
+                    file_nonce_base: secureArrayBufferToBase64(fileNonceBase.buffer),
+                    chunkSize: CHUNK_SIZE,
+                    orig_name: sanitizeFilename(encryptFile.name),
+                    orig_size: encryptFile.size
+                };
+                
+                const headerStringForAAD = secureCanonicalJsonStringify(headerDataForAAD);
+                const headerBytesForAAD = new TextEncoder().encode(headerStringForAAD);
+
+                const encrypted_sk = await aesGcmEncrypt(passwordKey, secretKey, iv_for_sk, headerBytesForAAD);
+                secretKey.fill(0);
+
+                const finalHeaderData = { ...headerDataForAAD, sk_iv: secureArrayBufferToBase64(iv_for_sk.buffer) };
+                const finalHeaderBytes = new TextEncoder().encode(secureCanonicalJsonStringify(finalHeaderData));
+                
+                const headerLengthBuffer = new ArrayBuffer(4);
+                new DataView(headerLengthBuffer).setUint32(0, finalHeaderBytes.length, true);
+
+                const encryptedSkLengthBuffer = new ArrayBuffer(4);
+                new DataView(encryptedSkLengthBuffer).setUint32(0, encrypted_sk.length, true);
+
+                logStatus('Streaming encrypted data...');
+                const encryptionStream = createEncryptionStream(fileAesKey, fileNonceBase);
+                const encryptedFileStream = encryptFile.stream().pipeThrough(encryptionStream);
+
+                const finalFileName = sanitizeFilename(encryptFile.name) + '.enc';
+                const fileWriter = streamSaver.createWriteStream(finalFileName).getWriter();
+
+                await fileWriter.write(new Uint8Array(headerLengthBuffer));
+                await fileWriter.write(finalHeaderBytes);
+                await fileWriter.write(new Uint8Array(encryptedSkLengthBuffer));
+                await fileWriter.write(encrypted_sk);
+
+                const reader = encryptedFileStream.getReader();
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    await fileWriter.write(value);
+                }
+                await fileWriter.close();
+
+                logStatus(`Vault created: ${finalFileName}`, 'success');
+
+            } catch (err) {
+                logStatus(err.message || 'Error occurred.', 'error');
+            } finally {
+                if (secretKey) secretKey.fill(0);
+                if (sharedSecret) sharedSecret.fill(0);
+                if (aesKeyBytes) aesKeyBytes.fill(0);
+                encryptPasswordInput.value = '';
+                showSpinner(false, encryptBtn, encryptSpinner, encryptBtnText, toggleEncryptPasswordBtn);
+                setProcessingState(false);
+            }
+        };
+
+        const handleDecrypt = async () => {
+            if (!decryptFile || !decryptPasswordInput.value) {
+                logStatus('Select a file and enter password.', 'error');
+                return;
+            }
+            
+            clearStatus();
+            setProcessingState(true);
+            resetPasswordVisibility(decryptPasswordInput, eyeDecryptIcon, eyeOffDecryptIcon);
+            showSpinner(true, decryptBtn, decryptSpinner, decryptBtnText, toggleDecryptPasswordBtn);
+            
+            let streamReader, kyber_sk, sharedSecret, aesKeyBytes;
+
+            try {
+                logStatus('Accessing encrypted stream...');
+                const fileStream = decryptFile.stream();
+                streamReader = fileStream.getReader();
+                let internalBuffer = new Uint8Array(0);
+
+                async function readNextBytes(numBytes) {
+                    while (internalBuffer.length < numBytes) {
+                        const { value, done } = await streamReader.read();
+                        if (done) throw new Error('Truncated file.');
+                        const newBuffer = new Uint8Array(internalBuffer.length + value.length);
+                        newBuffer.set(internalBuffer);
+                        newBuffer.set(value, internalBuffer.length);
+                        internalBuffer = newBuffer;
+                    }
+                    const result = internalBuffer.slice(0, numBytes);
+                    internalBuffer = internalBuffer.slice(numBytes);
+                    return result;
+                }
+                
+                const headerLengthBytes = await readNextBytes(4);
+                const headerLength = new DataView(headerLengthBytes.buffer).getUint32(0, true);
+                const headerBytes = await readNextBytes(headerLength);
+                const header = JSON.parse(new TextDecoder().decode(headerBytes));
+                
+                const salt = new Uint8Array(secureBase64ToArrayBuffer(header.salt));
+                const kem_ct = new Uint8Array(secureBase64ToArrayBuffer(header.kem_ct));
+                const iv_for_sk = new Uint8Array(secureBase64ToArrayBuffer(header.sk_iv));
+                
+                const encryptedSkLengthBytes = await readNextBytes(4);
+                const encryptedSkLength = new DataView(encryptedSkLengthBytes.buffer).getUint32(0, true);
+                const encrypted_sk = await readNextBytes(encryptedSkLength);
+
+                const passwordKey = await getPasswordDerivedKey(decryptPasswordInput.value, salt);
+                
+                const headerForAAD = { ...header };
+                delete headerForAAD.sk_iv;
+                const headerBytesForAAD = new TextEncoder().encode(secureCanonicalJsonStringify(headerForAAD));
+                
+                const decrypted_sk = await aesGcmDecrypt(passwordKey, encrypted_sk, iv_for_sk, headerBytesForAAD);
+                kyber_sk = new Uint8Array(decrypted_sk);
+
+                const kem = new MlKem768();
+                const ss = await kem.decap(kem_ct, kyber_sk);
+                sharedSecret = new Uint8Array(ss);
+                kyber_sk.fill(0);
+
+                const { aesKeyBytes: derivedAesKeyBytes, fileNonceBase: derivedFileNonceBase } = await deriveSecretsFromKEMSharedSecret(sharedSecret, kem_ct);
+                aesKeyBytes = new Uint8Array(derivedAesKeyBytes);
+                sharedSecret.fill(0);
+
+                const aesKey = await crypto.subtle.importKey('raw', aesKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
+                aesKeyBytes.fill(0);
+
+                logStatus('Restoring original file...');
+                const decryptionStream = createDecryptionStream(aesKey, new Uint8Array(secureBase64ToArrayBuffer(header.file_nonce_base)), header.orig_size);
+                const originalFileName = sanitizeFilename(header.orig_name || 'restored_file');
+                const fileWriter = streamSaver.createWriteStream(originalFileName);
+
+                const remainingStream = new ReadableStream({
+                    async pull(controller) {
+                        if (internalBuffer.length > 0) {
+                            controller.enqueue(internalBuffer);
+                            internalBuffer = new Uint8Array(0);
+                        }
+                        const { value, done } = await streamReader.read();
+                        if (done) { controller.close(); return; }
+                        controller.enqueue(value);
+                    }
+                });
+                
+                await remainingStream.pipeThrough(decryptionStream).pipeTo(fileWriter);
+                logStatus(`Success: ${originalFileName} restored.`, 'success');
+
+            } catch (err) {
+                logStatus('Decryption failed: Check credentials.', 'error');
+                if (streamReader) streamReader.cancel().catch(() => {});
+            } finally {
+                if (kyber_sk) kyber_sk.fill(0);
+                if (sharedSecret) sharedSecret.fill(0);
+                if (aesKeyBytes) aesKeyBytes.fill(0);
+                decryptPasswordInput.value = '';
+                showSpinner(false, decryptBtn, decryptSpinner, decryptBtnText, toggleDecryptPasswordBtn);
+                setProcessingState(false);
+            }
+        };
+        
+        const encryptDropZone = document.getElementById('encrypt-drop-zone');
+        const decryptDropZone = document.getElementById('decrypt-drop-zone');
+
+        const updateGlow = (zone, hasFile, type) => {
+            const glowClass = `file-zone-has-file-${type}`;
+            zone.classList.toggle(glowClass, hasFile);
+        };
+
+        ['dragover', 'dragleave', 'drop'].forEach(eventName => {
+            encryptDropZone.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            decryptDropZone.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+
+        encryptDropZone.addEventListener('dragover', () => encryptDropZone.classList.add('file-zone-hover'));
+        encryptDropZone.addEventListener('dragleave', () => encryptDropZone.classList.remove('file-zone-hover'));
+        encryptDropZone.addEventListener('drop', e => {
+            encryptDropZone.classList.remove('file-zone-hover');
+            if (e.dataTransfer.files.length > 0) {
+                encryptFileInput.files = e.dataTransfer.files;
+                encryptFileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        decryptDropZone.addEventListener('dragover', () => decryptDropZone.classList.add('file-zone-hover'));
+        decryptDropZone.addEventListener('dragleave', () => decryptDropZone.classList.remove('file-zone-hover'));
+        decryptDropZone.addEventListener('drop', e => {
+            decryptDropZone.classList.remove('file-zone-hover');
+            if (e.dataTransfer.files.length > 0) {
+                decryptFileInput.files = e.dataTransfer.files;
+                decryptFileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        encryptTabBtn.addEventListener('click', () => switchTab('encrypt'));
+        decryptTabBtn.addEventListener('click', () => switchTab('decrypt'));
+        
+        encryptFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                encryptFile = e.target.files[0];
+                encryptFileName.textContent = encryptFile.name;
+                logStatus(`Target: ${encryptFile.name}`);
+                updateGlow(encryptDropZone, true, 'encrypt');
+            } else {
+                encryptFile = null;
+                encryptFileName.textContent = 'No file selected';
+                updateGlow(encryptDropZone, false, 'encrypt');
+            }
+        });
+        
+        decryptFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                decryptFile = e.target.files[0];
+                decryptFileName.textContent = decryptFile.name;
+                logStatus(`Source: ${decryptFile.name}`);
+                updateGlow(decryptDropZone, true, 'decrypt');
+            } else {
+                decryptFile = null;
+                decryptFileName.textContent = 'No file selected';
+                updateGlow(decryptDropZone, false, 'decrypt');
+            }
+        });
+        
+        encryptBtn.addEventListener('click', handleEncrypt);
+        decryptBtn.addEventListener('click', handleDecrypt);
+        
+        toggleEncryptPasswordBtn.addEventListener('click', () => togglePasswordVisibility(encryptPasswordInput, eyeEncryptIcon, eyeOffEncryptIcon));
+        toggleDecryptPasswordBtn.addEventListener('click', () => togglePasswordVisibility(decryptPasswordInput, eyeDecryptIcon, eyeOffDecryptIcon));
+
+        encryptPasswordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') encryptBtn.click(); });
+        decryptPasswordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') decryptBtn.click(); });
+
+    </script>
+</body>
+</html>
