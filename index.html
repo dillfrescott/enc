@@ -68,6 +68,8 @@
             justify-content: center;
             align-items: center;
             padding: 2rem 1rem;
+            position: relative;
+            z-index: 10;
         }
 
         .workspace-card {
@@ -75,8 +77,12 @@
             max-width: 30rem;
             display: flex;
             flex-direction: column;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: #000;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), 0 0 100px rgba(255, 255, 255, 0.02);
+            z-index: 10;
         }
 
         .log-section {
@@ -89,13 +95,24 @@
             overflow-y: auto;
             padding: 0.75rem 1rem;
         }
+
+        #particleCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
     </style>
 </head>
 <body class="bg-black text-white selection:bg-white/20">
+    <canvas id="particleCanvas"></canvas>
     <div class="app-container">
         <!-- Logo/Header -->
         <div class="mb-8 text-center flex-shrink-0">
-            <h1 class="text-4xl font-light tracking-tighter text-white mb-1">ENC</h1>
+            <h1 class="text-5xl font-extrabold tracking-tight mb-2" style="color: #ffffff; font-weight: 800; letter-spacing: -0.05em; background: linear-gradient(135deg, #ffffff 0%, #f4f4f7 50%, #ffffff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">ENC</h1>
             <p class="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">Post-Quantum Security</p>
         </div>
 
@@ -787,6 +804,67 @@
         encryptPasswordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') encryptBtn.click(); });
         decryptPasswordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') decryptBtn.click(); });
 
+    </script>
+    <script>
+        (function() {
+            const canvas = document.getElementById('particleCanvas');
+            const ctx = canvas.getContext('2d');
+            let particles = [];
+            let animationId = null;
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resize();
+            window.addEventListener('resize', resize);
+
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    this.vx = (Math.random() - 0.5) * 0.4;
+                    this.vy = (Math.random() - 0.5) * 0.4;
+                    this.radius = Math.random() * 2 + 1;
+                    this.opacity = Math.random() * 0.4 + 0.15;
+                    this.color = Math.random() > 0.5 ? '255, 255, 255' : '156, 163, 175';
+                }
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    if (this.x < 0) this.x = canvas.width;
+                    if (this.x > canvas.width) this.x = 0;
+                    if (this.y < 0) this.y = canvas.height;
+                    if (this.y > canvas.height) this.y = 0;
+                }
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${this.color}, ${this.opacity})`;
+                    ctx.fill();
+                }
+            }
+
+            function init() {
+                particles = [];
+                const particleCount = Math.floor((canvas.width * canvas.height) / 20000);
+                for (let i = 0; i < particleCount; i++) {
+                    particles.push(new Particle());
+                }
+            }
+
+            function animate() {
+                if (particles.length === 0) init();
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(p => {
+                    p.update();
+                    p.draw();
+                });
+                animationId = requestAnimationFrame(animate);
+            }
+
+            animate();
+        })();
     </script>
 </body>
 </html>
