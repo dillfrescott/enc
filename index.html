@@ -83,6 +83,8 @@
             -webkit-backdrop-filter: blur(20px);
             box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), 0 0 100px rgba(255, 255, 255, 0.02);
             z-index: 10;
+            border-radius: 12px;
+            overflow: hidden;
         }
 
         .log-section {
@@ -137,7 +139,7 @@
                             <div class="space-y-3">
                                 <label class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ml-1">Input File</label>
                                 <input type="file" id="encrypt-file-input" class="hidden">
-                                <label for="encrypt-file-input" id="encrypt-drop-zone" class="group relative flex flex-col items-center justify-center py-10 border border-white/10 cursor-pointer hover:border-white transition-all duration-200">
+                                <label for="encrypt-file-input" id="encrypt-drop-zone" class="group relative flex flex-col items-center justify-center py-10 border border-white/10 cursor-pointer hover:border-white transition-all duration-200 rounded-lg">
                                     <span class="text-[11px] font-bold uppercase tracking-widest text-white/60 group-hover:text-white">Select File</span>
                                     <span class="text-[10px] text-white/20 mt-1 uppercase tracking-tighter">Drag & Drop</span>
                                 </label>
@@ -147,7 +149,7 @@
                             <div class="space-y-3">
                                 <label for="encrypt-password" class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ml-1">Password</label>
                                 <div class="relative group">
-                                    <input type="password" id="encrypt-password" class="w-full bg-black border border-white/10 px-4 py-4 text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-white transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed" placeholder="Minimum 8 characters">
+                                    <input type="password" id="encrypt-password" class="w-full bg-black border border-white/10 px-4 py-4 text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-white transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg" placeholder="Minimum 8 characters">
                                     <button type="button" id="toggle-encrypt-password-btn" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors">
                                         <svg id="eye-encrypt-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                         <svg id="eye-off-encrypt-icon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
@@ -155,7 +157,7 @@
                                 </div>
                             </div>
 
-                            <button id="encrypt-btn" class="group relative w-full border border-white text-white font-bold text-[11px] uppercase tracking-[0.3em] py-5 hover:bg-white hover:text-black transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center">
+                            <button id="encrypt-btn" class="group relative w-full border border-white text-white font-bold text-[11px] uppercase tracking-[0.3em] py-5 hover:bg-white hover:text-black transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center rounded-lg">
                                 <div id="encrypt-spinner" class="absolute inset-0 flex items-center justify-center hidden">
                                     <svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -171,7 +173,7 @@
                             <div class="space-y-3">
                                 <label class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ml-1">Encrypted File</label>
                                 <input type="file" id="decrypt-file-input" class="hidden" accept=".enc">
-                                <label for="decrypt-file-input" id="decrypt-drop-zone" class="group relative flex flex-col items-center justify-center py-10 border border-white/10 cursor-pointer hover:border-white transition-all duration-200">
+                                <label for="decrypt-file-input" id="decrypt-drop-zone" class="group relative flex flex-col items-center justify-center py-10 border border-white/10 cursor-pointer hover:border-white transition-all duration-200 rounded-lg">
                                     <span class="text-[11px] font-bold uppercase tracking-widest text-white/60 group-hover:text-white">Select .enc</span>
                                     <span class="text-[10px] text-white/20 mt-1 uppercase tracking-tighter">Drag & Drop</span>
                                 </label>
@@ -181,7 +183,7 @@
                             <div class="space-y-3">
                                 <label for="decrypt-password" class="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ml-1">Password</label>
                                 <div class="relative group">
-                                    <input type="password" id="decrypt-password" class="w-full bg-black border border-white/10 px-4 py-4 text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-white transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed" placeholder="Enter original password">
+                                    <input type="password" id="decrypt-password" class="w-full bg-black border border-white/10 px-4 py-4 text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-white transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed rounded-lg" placeholder="Enter original password">
                                     <button type="button" id="toggle-decrypt-password-btn" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors">
                                         <svg id="eye-decrypt-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                         <svg id="eye-off-decrypt-icon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
@@ -189,7 +191,7 @@
                                 </div>
                             </div>
 
-                            <button id="decrypt-btn" class="group relative w-full border border-white text-white font-bold text-[11px] uppercase tracking-[0.3em] py-5 hover:bg-white hover:text-black transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center">
+                            <button id="decrypt-btn" class="group relative w-full border border-white text-white font-bold text-[11px] uppercase tracking-[0.3em] py-5 hover:bg-white hover:text-black transition-all duration-200 disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center rounded-lg">
                                 <div id="decrypt-spinner" class="absolute inset-0 flex items-center justify-center hidden">
                                     <svg class="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
