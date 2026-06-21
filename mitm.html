@@ -61,14 +61,12 @@ function onMessage (event) {
   let { data, ports, origin } = event
 
   // It's important to have a messageChannel, don't want to interfere
-  // with other simultaneous downloads
-  if (!ports || !ports.length) {
-    throw new TypeError("[StreamSaver] You didn't send a messageChannel")
-  }
-
-  if (typeof data !== 'object') {
-    throw new TypeError("[StreamSaver] You didn't send a object")
-  }
+  // with other simultaneous downloads. Ignore any messages that don't
+  // carry a port — they aren't from StreamSaver (browser extensions,
+  // pings, broadcasts, etc.) and throwing here breaks queued messages
+  // that arrived before the service worker was ready.
+  if (!ports || !ports.length) return
+  if (typeof data !== 'object') return
 
   // the default public service worker for StreamSaver is shared among others.
   // so all download links needs to be prefixed to avoid any other conflict
